@@ -46,7 +46,7 @@ class Sudoku{
   }
   
   symmetricDifference(arrays) {
-    return [...Set([...difference(arrays), ...difference(arrays.reverse())])];
+    return [...new Set([...this.difference(arrays), ...this.difference(arrays.reverse())])];
   }  
 
   getMatrix(i, j){ 
@@ -90,7 +90,7 @@ class Sudoku{
   }
 
   getSolutions(array){
-    array.map(x => {
+    return array.map(x => {
       return x.solutions;
     }).filter(x => {
       return x != null
@@ -137,17 +137,17 @@ class Sudoku{
   diffSearch(){
     this.cycle((i, j) => {
       let element = this.matrix[i][j];
-      if(element.solutions != null){
-        var column = this.getColumn(j).filter(x => {
-          return Array.isArray(x);
-        });
-        var row = this.getRow(i).filter(x => {
-          return Array.isArray(x);
-        });
-        let val = this.singletone([...column, ...row]);
-        if(val){              
-          this.matrix[i][j] = val;
-        }     
+      if(element.solutions != null){        
+        let row = new Set(this.union(this.getSolutions(this.getRow(i)).filter(x => x != element.solutions)));
+        let column = new Set(this.union(this.getSolutions(this.getColumn(j)).filter(x => x != element.solutions)));        
+        let matrix = new Set(this.union(this.getSolutions(this.union(this.getMatrix(i, j))).filter(x => x != element.solutions)));
+        element.solutions.forEach(x => {
+          if(!row.has(x) && !column.has(x) && !matrix.has(x)){
+            this.matrix[i][j].solutions = null;
+            this.matrix[i][j].value = x;
+            return true;
+          }
+        });        
       }          
     });   
     return false;
