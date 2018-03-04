@@ -1,15 +1,52 @@
 class Sudoku{  
   constructor(matrix){
-    this.matrix = matrix;  
+    this.matrix = this.init(matrix);  
     this.values = [1, 2, 3, 4, 5, 6, 7, 8, 9];    
-    this.length = 3; 
-    this.solutions = new Map();
+    this.length = 3;   
   }
 
-  toArray(matrix){
-    return matrix.reduce((prev, current) => {
-      return current.concat(...prev);
+  init(matrix){
+    let newMatrix = new Array(matrix.length);      
+    for(let i = 0; i < matrix.length; i++){
+      newMatrix[i] = new Array(matrix.length);      
+      for(let j = 0; j < matrix.length; j++){
+        newMatrix[i][j] = {
+          solutions: null,
+          value: matrix[i][j]
+        }
+      }
+    }   
+    return newMatrix;
+  }  
+  
+  cycle(callback){    
+    for(let i = 0; i < this.matrix.length; i++){
+      for(let j = 0; j < this.matrix.length; j++){
+        callback(i, j);
+      }
+    }          
+  }
+  
+  union(arrays){
+    return arrays.reduce((prev, current) => {
+      return [...current, ...prev];
     }, []);
+  }  
+
+  intersects(arrays){
+    return arrays.reduce((prev, current) => {       
+      return prev.length == 0 ? current : [...new Set(current)].filter(x => new Set(prev).has(x))
+    }, []);    
+  }
+
+  difference(arrays) {
+    return arrays.reduce((prev, current) => {       
+      return prev.length == 0 ? current : [...new Set(current)].filter(x => !new Set(prev).has(x))
+    }, []);  
+  }
+  
+  symmetricDifference(arrays) {
+    return [...Set([...difference(arrays), ...difference(arrays.reverse())])];
   }  
 
   getMatrix(i, j){ 
@@ -21,7 +58,7 @@ class Sudoku{
         internal[y][x] = this.matrix[i][j];
       }
     }        
-    return internal
+    return internal;
   }  
 
   getRow(index){
@@ -46,53 +83,116 @@ class Sudoku{
     return array.filter(x => {x == symbol}).length;
   }
 
-  solve(){    
-    let iteration = 81;
-    while(iteration--){
-      for(let i = 0; i < this.matrix.length; i++){
-        for(let j = 0; j < this.matrix.length; j++){
-          if(this.matrix[i][j] == 0){
-            let internal = this.getMatrix(i, j);
-            let arrays = [
-              this.getPosibleValues(this.toArray(internal)), 
-              this.getPosibleValues(this.getColumn(j)), 
-              this.getPosibleValues(this.getRow(i))
-            ];
-            let posibleValues = this.intersects(arrays);
-            if(posibleValues.length == 1){
-              this.matrix[i][j] = posibleValues[0];              
-            }else{   
-              let row = this.solutions.get(i);                            
-              if(row != undefined){
-                row.set(j, posibleValues)
-                if(count(this.matrix[i], 0) === row.size){
-                  posibleValues = diff(row.values());
-                  if(posibleValues.length == 1){
-                    this.matrix[i][j] = posibleValues[0];              
-                  }
-                }              
-              }              
-            }           
+  getValues(array){
+    return array.map(x => {
+      return x.value;
+    });
+  }
+
+  getSolutions(array){
+    array.map(x => {
+      return x.solutions;
+    }).filter(x => {
+      return x != null
+    });
+  }
+
+  intersectSearch(i, j){
+    let internal = this.getMatrix(i, j);
+    let arrays = [
+      this.getPosibleValues(this.getValues(this.union(internal))), 
+      this.getPosibleValues(this.getValues(this.getColumn(j))), 
+      this.getPosibleValues(this.getValues(this.getRow(i)))
+    ];
+    return this.intersects(arrays);    
+  }  
+
+  singletoneSearch(){  
+    let counter = 0;  
+    while(1){        
+      let changed = false;   
+      this.cycle((i, j) => {
+        let element = this.matrix[i][j];        
+        if(element.value == 0){
+          let posibleValues = this.intersectSearch(i, j);
+          if(posibleValues.length == 1){              
+            this.matrix[i][j].value = posibleValues[0];
+            this.matrix[i][j].solutions = null;
+            changed = true;
           }
+          else{                   
+            this.matrix[i][j].solutions = posibleValues.length == 0 ? null : posibleValues;
+            this.matrix[i][j].value = 0;
+          }                       
         }
+      });
+      if(!changed){
+        break;
+      }
+      counter++;
+    } 
+    return counter > 0;       
+  }
+
+  diffSearch(){
+    this.cycle((i, j) => {
+      let element = this.matrix[i][j];
+      if(element.solutions != null){
+        var column = this.getColumn(j).filter(x => {
+          return Array.isArray(x);
+        });
+        var row = this.getRow(i).filter(x => {
+          return Array.isArray(x);
+        });
+        let val = this.singletone([...column, ...row]);
+        if(val){              
+          this.matrix[i][j] = val;
+        }     
       }          
-    }
-    console.log(this.solutions);
-    console.log(this.matrix.map(x => { return x.toString()}));
+    });   
+    return false;
+  }
+
+  solve(){ 
+    let changed = true;
+    while(changed){      
+      changed = this.singletoneSearch();
+      if(!changed){
+        changed = this.diffSearch();
+      }      
+      if(!changed){
+        break;
+      }
+    }     
+    this.cycle((i, j) => {
+      this.matrix[i][j] = this.matrix[i][j].value;      
+    });       
     return this.matrix;
   }  
 
-  diff(arrays){
-    return arrays.reduce((prev, current) => {       
-      return prev.filter(x => { return current.indexOf(x) < 0;});
-    }, []);
-  }
-
-  intersects(arrays){
-    return arrays.reduce((prev, current) => {       
-      return prev.length == 0 ? current : [...new Set(current)].filter(x => new Set(prev).has(x))
-    }, []);    
-  }
+  // singletone(arrays){
+  //   let union = arrays.reduce((prev, current) => {       
+  //     return [...prev, ...current]
+  //   }, []);
+  //   let map = new Map();
+  //   union.forEach(x => {
+  //     let number = map.get(x);
+  //     if(!number){
+  //       number = 0;
+  //     }
+  //     map.set(x, ++number);
+  //   });
+  //   let unique = [];
+  //   for(let [key, value] of map){
+  //     if(value == 1){
+  //       unique.push(key);
+  //     }
+  //   }
+  //   if(unique.length == 1){
+  //     return unique[0];
+  //   }
+  //   return undefined;
+  // }
 
   getPosibleValues(currentValues = []){        
     let posibleValues = [];
