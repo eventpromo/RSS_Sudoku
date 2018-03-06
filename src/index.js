@@ -1,8 +1,21 @@
 class Sudoku{  
-  constructor(matrix){
-    this.matrix = this.init(matrix);  
+  constructor(matrix, withoutInit = false){
+    this.matrix = withoutInit ? matrix : this.init(matrix);  
     this.values = [1, 2, 3, 4, 5, 6, 7, 8, 9];    
     this.length = 3;   
+  }
+
+  get state(){
+    return this.matrix;
+  }
+
+  toValue(){
+    for(let i = 0; i < this.matrix.length; i++){
+      for(let j = 0; j < this.matrix.length; j++){
+        this.matrix[i][j] = this.matrix[i][j].value;      
+      }
+    }  
+    return this.matrix;    
   }
 
   init(matrix){
@@ -115,9 +128,8 @@ class Sudoku{
         for(let j = 0; j < this.matrix.length; j++){
           let element = this.matrix[i][j];        
           if(element.value == 0){
-            if(this.matrix[i][j].solutions && this.matrix[i][j].solutions.length == 1){
-              this.matrix[i][j].value = this.matrix[i][j].solutions[0];
-              this.matrix[i][j].solutions = null;              
+            if(element.solutions && element.solutions.length == 1){
+              this.clearSingletone(element);           ;
             }
             else{
               let posibleValues = this.intersectSearch(i, j);
@@ -153,27 +165,17 @@ class Sudoku{
       for(let i = 0; i < this.matrix.length; i++){
         for(let j = 0; j < this.matrix.length; j++){
           let element = this.matrix[i][j];
-          if(element.solutions != null){  
-            let row = this.getRow(i).filter(x => x.solutions && x.id != element.id);
-            let column = this.getColumn(j).filter(x => x.solutions && x.id != element.id);
-            let matrix = this.union(this.getMatrix(i, j)).filter(x => x.solutions && x.id != element.id);
-
+          if(element.solutions != null){                          
             if(element.solutions.length == 1){              
-              column.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              matrix.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              row.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              this.matrix[i][j].value = element.solutions[0];
-              this.matrix[i][j].solutions = null; 
+              this.clearSingletone(element);
               changed = true;
               continue;                           
             }
             
+            let row = this.getRow(i).filter(x => x.solutions && x.id != element.id);
+            let column = this.getColumn(j).filter(x => x.solutions && x.id != element.id);
+            let matrix = this.union(this.getMatrix(i, j)).filter(x => x.solutions && x.id != element.id);
+
             let rowSet = new Set(this.union(this.getSolutions(row)));        
             let rowDiff = this.difference(element.solutions, [...rowSet]);
             if(rowDiff.length == 1){              
@@ -188,7 +190,7 @@ class Sudoku{
               changed = true;
               continue;
             } 
-
+            
             let columnSet = new Set(this.union(this.getSolutions(column)));        
             let columnDiff = this.difference(element.solutions, [...columnSet]);
             if(columnDiff.length == 1){              
@@ -203,7 +205,7 @@ class Sudoku{
               changed = true;
               continue;
             }
-
+            
             let matrixSet = new Set(this.union(this.getSolutions(matrix)));
             let matrixDiff = this.difference(element.solutions, [...matrixSet]);
             if(matrixDiff.length == 1){              
@@ -238,21 +240,7 @@ class Sudoku{
           let element = this.matrix[i][j];       
           if(element.solutions){
             if(element.solutions.length == 1){    
-              let row = this.getRow(i).filter(x => x.solutions && x.id != element.id);
-              let column = this.getColumn(j).filter(x => x.solutions && x.id != element.id);
-              let matrix = this.union(this.getMatrix(i, j)).filter(x => x.solutions && x.id != element.id);
-              
-              column.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              matrix.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              row.forEach(x => {
-                this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
-              });
-              this.matrix[i][j].value = element.solutions[0];
-              this.matrix[i][j].solutions = null; 
+              this.clearSingletone(element);
               changed = true;
               continue;                           
             }
@@ -280,6 +268,24 @@ class Sudoku{
     return counter > 0;   
   }
 
+  clearSingletone(element){
+    let row = this.getRow(element.i).filter(x => x.solutions && x.id != element.id);
+    let column = this.getColumn(element.j).filter(x => x.solutions && x.id != element.id);
+    let matrix = this.union(this.getMatrix(element.i, element.j)).filter(x => x.solutions && x.id != element.id);
+    
+    column.forEach(x => {
+      this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
+    });
+    matrix.forEach(x => {
+      this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
+    });
+    row.forEach(x => {
+      this.matrix[x.i][x.j].solutions = this.remove(x.solutions, element.solutions);
+    });
+    this.matrix[element.i][element.j].value = element.solutions[0];
+    this.matrix[element.i][element.j].solutions = null; 
+  }
+
   clearPair(element, block){
     let changed = false;
     let pair = block.filter(x => this.compare(element.solutions, x.solutions));
@@ -288,33 +294,17 @@ class Sudoku{
         if(pair[0].id != x.id && pair[1].id != x.id){
           let solutions = this.remove(x.solutions, element.solutions)
           if(solutions.length < this.matrix[x.i][x.j].solutions.length){
-            this.matrix[x.i][x.j].solutions = solutions;
+            if(solutions.length == 1){
+              this.clearSingletone(this.matrix[x.i][x.j]);
+            }else{
+              this.matrix[x.i][x.j].solutions = solutions;
+            }            
             changed = true;
           }          
         }
       });
     }
     return changed;
-  }
-
-  check(){    
-    for(var i = 0; i < this.matrix.length; i++){
-      if(this.getColumn(i).filter(x => x.value == 0).length > 0){
-        return false;
-      }
-      if(this.getRow(i).filter(x => x.value == 0).length > 0){
-        return false;
-      }
-    }
-    return true;
-  }
-
-  randomSearch(){
-    for(let i = 0; i < this.matrix.length; i++){
-      for(let j = 0; j < this.matrix.length; j++){
-        this.matrix[i][j] = this.matrix[i][j].value;      
-      }
-    }    
   }
 
   swordfishSearch(){
@@ -324,32 +314,58 @@ class Sudoku{
       let v = 1;
       while(v < 10){
         let rows = [];
+        let columns = [];
+
         for(let i = 0; i < this.matrix.length; i++){
           let row = this.getRow(i).filter(x => x.solutions != null);
-          let columns = [];
-          row.forEach(x => {
-            if(x.solutions.indexOf(v) >= 0){
-              columns.push(x);
-            }
-          });
-          if(columns.length >= 1 && columns.length <= this.length){
-            rows.push(columns);
-          }          
-        }
-        if(rows.length === this.length){
+          let column = this.getColumn(i).filter(x => x.solutions != null);
+          
+          rows.push(row.filter(x => x.solutions.indexOf(v) >= 0));
+          columns.push(column.filter(x => x.solutions.indexOf(v) >= 0));          
+        } 
+
+        rows = rows.filter(x => x.length >= 1 && x.length <= 3 );        
+        if(rows.length === 3){
           let columnNumbers = [...new Set(this.union(rows).map(x => x.j))];
           let rowNumbers = [...new Set(this.union(rows).map(x => x.i))];
-          if(columnNumbers.length === this.length){
+          if(columnNumbers.length === 3){
             columnNumbers.forEach(x => {
               let column = this.getColumn(x).filter(c => c.solutions && rowNumbers.indexOf(c.i) < 0);
               column.forEach(y => {
                 let solutions = this.remove(y.solutions, [v]);
                 if(this.matrix[y.i][y.j].solutions && solutions.length < this.matrix[y.i][y.j].solutions.length){
-                  this.matrix[y.i][y.j].solutions = solutions;
+                  if(solutions.length == 1){
+                    this.clearSingletone(this.matrix[y.i][y.j]);
+                  }else{
+                    this.matrix[y.i][y.j].solutions = solutions;
+                  }                      
                   changed = true;
                 }
               })              
             });
+          }          
+        }     
+        if(!changed){
+          columns = columns.filter(x => x.length >= 1 && x.length <= 3 );
+          if(columns.length === 3){
+            let columnNumbers = [...new Set(this.union(columns).map(x => x.j))];
+            let rowNumbers = [...new Set(this.union(columns).map(x => x.i))];
+            if(rowNumbers.length === 3){
+              rowNumbers.forEach(x => {
+                let row = this.getRow(x).filter(c => c.solutions && columnNumbers.indexOf(c.j) < 0);
+                row.forEach(y => {
+                  let solutions = this.remove(y.solutions, [v]);
+                  if(solutions.length < this.matrix[y.i][y.j].solutions.length){
+                    if(solutions.length == 1){
+                      this.clearSingletone(this.matrix[y.i][y.j]);
+                    }else{
+                      this.matrix[y.i][y.j].solutions = solutions;
+                    }                      
+                    changed = true;
+                  }
+                });            
+              });
+            }
           }
         }
         v++;
@@ -362,7 +378,46 @@ class Sudoku{
     return counter > 0;   
   }
 
-  solve(){ 
+  check(){    
+    for(let i = 0; i < this.matrix.length; i++){
+      let column = new Set(this.getColumn(i).map(x => x.value));
+      if(column.has(0) || column.size < 9){
+        return false;
+      }
+      let row = new Set(this.getRow(i).map(x => x.value));
+      if(row.has(0) || row.size < 9){
+        return false;
+      }
+    }
+    return true;
+  }
+
+  randomSearch(){
+    if(this.check()){              
+      return this.matrix;
+    }
+    for(let i = 0; i < this.matrix.length; i++){
+      for(let j = 0; j < this.matrix.length; j++){
+        let element = this.matrix[i][j];
+        if(element.solutions && element.solutions.length > 1){
+          for(let k = 0; k < element.solutions.length; k++){
+            let solution = element.solutions[k];
+            let copy = JSON.parse(JSON.stringify(this.matrix));
+            copy[i][j].value = solution;
+            copy[i][j].solutions = null;
+            let temp = new Sudoku(copy, true);            
+            this.matrix = temp.search();
+            if(this.check()){                  
+              return this.matrix;
+            }
+          }
+        }
+      }
+    }
+    return this.matrix;
+  }  
+
+  search(){ 
     let changed = true;
     while(changed){      
       changed = this.singletoneSearch();
@@ -378,20 +433,19 @@ class Sudoku{
       if(!changed){
         break;
       }
+    }  
+    if(!this.check()){
+      return this.randomSearch();
     }    
-    // console.log(this.matrix.map(x => {
-    //   return x.map(y => {
-    //     var str = y.solutions == null ? "" : y.solutions.toString();
-    //     return "[" + y.value + ": " + str + "]";
-    //   })
-    // })); 
-    for(let i = 0; i < this.matrix.length; i++){
-      for(let j = 0; j < this.matrix.length; j++){
-        this.matrix[i][j] = this.matrix[i][j].value;      
-      }
-    }    
+    
     return this.matrix;
-  }    
+  }  
+  
+  solve(){
+    this.matrix = this.search();
+    this.toValue();
+    return this.matrix;
+  }
 
   getPosibleValues(currentValues = []){        
     let posibleValues = [];
