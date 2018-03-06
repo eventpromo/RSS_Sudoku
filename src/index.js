@@ -406,9 +406,9 @@ class Sudoku{
             copy[i][j].value = solution;
             copy[i][j].solutions = null;
             let temp = new Sudoku(copy, true);            
-            this.matrix = temp.search();
-            if(this.check()){                  
-              return this.matrix;
+            let checking = new Sudoku(temp.search(), true);
+            if(checking.check()){                  
+              return checking.state;
             }
           }
         }
