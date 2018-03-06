@@ -297,12 +297,24 @@ class Sudoku{
     return changed;
   }
 
-  check(){
-    let result = false;
+  check(){    
     for(var i = 0; i < this.matrix.length; i++){
-
+      if(this.getColumn(i).filter(x => x.value == 0).length > 0){
+        return false;
+      }
+      if(this.getRow(i).filter(x => x.value == 0).length > 0){
+        return false;
+      }
     }
-    return result;
+    return true;
+  }
+
+  randomSearch(){
+    for(let i = 0; i < this.matrix.length; i++){
+      for(let j = 0; j < this.matrix.length; j++){
+        this.matrix[i][j] = this.matrix[i][j].value;      
+      }
+    }    
   }
 
   swordfishSearch(){
